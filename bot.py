@@ -1,3 +1,4 @@
+
 import time
 import threading
 import requests
@@ -16,14 +17,12 @@ def send_message_with_keyboard(chat_id, text, is_blocked=False):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     
     if is_blocked:
-        # Clavier pour contacter l'administrateur
         keyboard = {
             "inline_keyboard": [
-                [{"text": "💬 CONTACTER L'ADMIN", "url": "https://t.me/MARC_KING"}]
+                [{"text": "💬 CONTACTER L'ADMIN", "url": "https://t.me/+tzWgZ8RnLog0NTc0"}]
             ]
         }
     else:
-        # Clavier pour demander un signal normal
         keyboard = {
             "inline_keyboard": [
                 [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
@@ -67,12 +66,11 @@ def listen_telegram_updates():
                         text = result["message"]["text"].strip()
                         
                         if text.startswith("/start"):
-                            # Initialise ou réinitialise le compteur si besoin, ou garde l'historique
                             if chat_id not in user_signal_counts:
                                 user_signal_counts[chat_id] = 0
                                 
                             welcome_msg = (
-                                "🚀 *ULTRA PRÉDICTOR* 🚀\n\n"
+                                "🚀 *RUBBEN226 ASSURANCE* 🚀\n\n"
                                 "Ce bot analyse les données LuckyJet et envoie des prédictions avec un taux de réussite affiché pouvant atteindre 98% 📊🔥\n\n"
                                 "Appuyez sur le bouton ci-dessous pour générer un signal !"
                             )
@@ -85,7 +83,6 @@ def listen_telegram_updates():
                         data_action = callback_query.get("data")
                         
                         if data_action == "get_signal":
-                            # Vérifie le nombre de signaux utilisés
                             current_count = user_signal_counts.get(chat_id, 0)
                             
                             if current_count >= MAX_FREE_SIGNALS:
@@ -94,7 +91,7 @@ def listen_telegram_updates():
                                     "⚠️ *VOS SIGNAUX SONT TERMINÉS*\n\n"
                                     f"_Vous avez utilisé vos {MAX_FREE_SIGNALS} signaux gratuits._\n\n"
                                     "🔥 *Pour obtenir de nouveaux signaux, contactez l'administrateur :*\n\n"
-                                    "👉 `@MARC_KING`"
+                                    "👉 [Cliquez ici pour contacter l'admin](https://t.me/+tzWgZ8RnLog0NTc0)"
                                 )
                                 send_message_with_keyboard(chat_id, blocked_msg, is_blocked=True)
                             else:
