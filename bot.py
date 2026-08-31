@@ -1,3 +1,4 @@
+
 import time
 import threading
 import requests
@@ -86,8 +87,6 @@ def listen_telegram_updates():
             print("Error in listen loop:", e)
             time.sleep(5)
 
-threading.Thread(target=listen_telegram_updates, daemon=True).start()
-
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -97,7 +96,11 @@ class SimpleHandler(BaseHTTPRequestHandler):
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
+    print(f"Web server running on port {port}")
     server.serve_forever()
 
-threading.Thread(target=run_web_server, daemon=True).start()
-
+if __name__ == "__main__":
+    # Lance le bot Telegram en arrière-plan
+    threading.Thread(target=listen_telegram_updates, daemon=True).start()
+    # Maintient le serveur web actif sur le thread principal pour Render
+    run_web_server()
