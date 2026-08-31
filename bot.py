@@ -1,9 +1,9 @@
-
 import time
 import threading
 import requests
 import os
 import random
+from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
@@ -47,7 +47,6 @@ def listen_telegram_updates():
                 for result in data.get("result", []):
                     offset = result["update_id"] + 1
                     
-                    # Si l'utilisateur envoie un message texte (ex: /start)
                     if "message" in result and "text" in result["message"]:
                         chat_id = result["message"]["chat"]["id"]
                         text = result["message"]["text"].strip()
@@ -60,7 +59,6 @@ def listen_telegram_updates():
                             )
                             send_message_with_keyboard(chat_id, welcome_msg)
                     
-                    # Si l'utilisateur clique sur le bouton interactif
                     elif "callback_query" in result:
                         callback_query = result["callback_query"]
                         callback_query_id = callback_query["id"]
@@ -68,19 +66,21 @@ def listen_telegram_updates():
                         data_action = callback_query.get("data")
                         
                         if data_action == "get_signal":
-                            # Retire l'effet de chargement du bouton sur Telegram
                             answer_callback_query(callback_query_id, "Signal généré ! 🚀")
                             
                             coeff = round(random.uniform(1.50, 4.50), 2)
                             assurance = round(coeff * 0.9, 2)
                             success_rate = random.randint(93, 98)
                             
+                            # Calcul de l'heure actuelle + 3 minutes
+                            future_time = (datetime.now() + timedelta(minutes=3)).strftime("%H:%M")
+                            
                             signal_msg = (
                                 "🔥 *SIGNAL PREMIUM* 🔥\n\n"
                                 f"🚀 *COEFFICIENT* – {coeff}X+\n"
                                 f"🛡️ *ASSURANCE* – {assurance}X\n"
                                 f"📊 *TAUX DE RÉUSSITE* – {success_rate}%\n"
-                                f"⏱️ *HEURE DE JEU* – {time.strftime('%H:%M')}\n\n"
+                                f"⏱️ *HEURE DE JEU* – {future_time}±\n\n"
                                 "Inscrivez-vous sur 1win avec le code promo *RUBB225* :\n"
                                 "👉 [Lien d'inscription](https://1win.ci/casino?p=4kpi)"
                             )
