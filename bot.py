@@ -1,4 +1,3 @@
-
 import time
 import threading
 import requests
@@ -10,7 +9,6 @@ TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
 
 def send_message_with_keyboard(chat_id, text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    # Création d'un bouton interactif en bas du message
     keyboard = {
         "inline_keyboard": [
             [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
@@ -48,7 +46,6 @@ def listen_telegram_updates():
                 for result in data.get("result", []):
                     offset = result["update_id"] + 1
                     
-                    # Gestion d'un message classique (ex: /start)
                     if "message" in result and "text" in result["message"]:
                         chat_id = result["message"]["chat"]["id"]
                         text = result["message"]["text"].strip()
@@ -61,7 +58,6 @@ def listen_telegram_updates():
                             )
                             send_message_with_keyboard(chat_id, welcome_msg)
                     
-                    # Gestion du clic sur le bouton interactif
                     elif "callback_query" in result:
                         callback_query = result["callback_query"]
                         callback_query_id = callback_query["id"]
@@ -71,7 +67,6 @@ def listen_telegram_updates():
                         if data_action == "get_signal":
                             answer_callback_query(callback_query_id, "Génération du signal...")
                             
-                            # Génération de valeurs aléatoires pour simuler le signal
                             coeff = round(random.uniform(1.50, 4.50), 2)
                             assurance = round(coeff * 0.9, 2)
                             success_rate = random.randint(93, 98)
@@ -105,3 +100,4 @@ def run_web_server():
     server.serve_forever()
 
 threading.Thread(target=run_web_server, daemon=True).start()
+
