@@ -1,11 +1,9 @@
-
 import time
 import threading
 import requests
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Telegram Credentials
 TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
 
 def send_message(chat_id, text):
@@ -37,7 +35,6 @@ def listen_telegram_updates():
                         chat_id = result["message"]["chat"]["id"]
                         text = result["message"]["text"].strip()
                         
-                        # Réaction à la commande /start ou autres
                         if text.startswith("/start"):
                             welcome_msg = (
                                 "🚀 *Bienvenue sur le bot Lucky Jet & 1win* 🚀\n\n"
@@ -51,10 +48,8 @@ def listen_telegram_updates():
             print("Erreur dans la boucle d'écoute :", e)
             time.sleep(5)
 
-# Lancer l'écoute Telegram dans un thread séparé
 threading.Thread(target=listen_telegram_updates, daemon=True).start()
 
-# --- Serveur Web pour Render ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
