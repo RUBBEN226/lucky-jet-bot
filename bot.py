@@ -22,15 +22,15 @@ def send_message_with_keyboard(chat_id, text):
         "reply_markup": keyboard
     }
     try:
-        requests.post(url, json=payload)
+        requests.post(url, json=payload, timeout=10)
     except Exception as e:
         print("Error sending message:", e)
 
-def answer_callback_query(callback_query_id, text):
+def answer_callback_query(callback_query_id, text=""):
     url = f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery"
-    payload = {"callback_query_id": callback_query_id, "text": text}
+    payload = {"callback_query_id": callback_query_id, "text": text, "show_alert": False}
     try:
-        requests.post(url, json=payload)
+        requests.post(url, json=payload, timeout=10)
     except Exception as e:
         print("Error answering callback:", e)
 
@@ -40,13 +40,14 @@ def listen_telegram_updates():
     while True:
         try:
             url = f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset={offset}&timeout=30"
-            response = requests.get(url)
+            response = requests.get(url, timeout=35)
             data = response.json()
             
             if data.get("ok"):
                 for result in data.get("result", []):
                     offset = result["update_id"] + 1
                     
+                    # Si l'utilisateur envoie un message texte (ex: /start)
                     if "message" in result and "text" in result["message"]:
                         chat_id = result["message"]["chat"]["id"]
                         text = result["message"]["text"].strip()
@@ -59,6 +60,7 @@ def listen_telegram_updates():
                             )
                             send_message_with_keyboard(chat_id, welcome_msg)
                     
+                    # Si l'utilisateur clique sur le bouton interactif
                     elif "callback_query" in result:
                         callback_query = result["callback_query"]
                         callback_query_id = callback_query["id"]
@@ -66,7 +68,8 @@ def listen_telegram_updates():
                         data_action = callback_query.get("data")
                         
                         if data_action == "get_signal":
-                            answer_callback_query(callback_query_id, "Génération du signal...")
+                            # Retire l'effet de chargement du bouton sur Telegram
+                            answer_callback_query(callback_query_id, "Signal généré ! 🚀")
                             
                             coeff = round(random.uniform(1.50, 4.50), 2)
                             assurance = round(coeff * 0.9, 2)
@@ -85,13 +88,15 @@ def listen_telegram_updates():
                             
         except Exception as e:
             print("Error in listen loop:", e)
-            time.sleep(5)
+            time.sleep(3)
 
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"Bot is running!")
+    def log_message(self, format, *args):
+        return
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
@@ -100,7 +105,5 @@ def run_web_server():
     server.serve_forever()
 
 if __name__ == "__main__":
-    # Lance le bot Telegram en arrière-plan
     threading.Thread(target=listen_telegram_updates, daemon=True).start()
-    # Maintient le serveur web actif sur le thread principal pour Render
     run_web_server()
