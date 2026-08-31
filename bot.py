@@ -9,48 +9,29 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
 ADMIN_ID = 8286650559  # Votre ID administrateur
 
-# Dictionnaire pour compter les signaux par utilisateur
-user_signal_counts = {}
-MAX_FREE_SIGNALS = 2
+# Dictionnaire pour stocker les signaux restants par utilisateur
+# On stocke sous la forme : { chat_id: {"used": X, "limit": 2} }
+user_signal_data = {}
 
-def send_message_with_keyboard(chat_id, text, is_blocked=False):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    
-    if is_blocked:
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": "💬 CONTACTER L'ADMIN", "url": "https://t.me/+tzWgZ8RnLog0NTc0"}]
-            ]
-        }
-    else:
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
-            ]
-        }
+def get_user_data(chat_id):
+    if chat_id not in user_signal_data:
+        user_signal_data[chat_id] = {"used": 0, "limit": 2}
+    return user_signal_data[chat_id]
 
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown",
-        "reply_markup": keyboard
-    }
-    try:
-        requests.post(url, json=payload, timeout=10)
-    except Exception as e:
-        print("Error sending message:", e)
-
-def send_simple_message(chat_id, text):
+def send_message_with_keyboard(chat_id, text, keyboard=None):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text,
         "parse_mode": "Markdown"
     }
+    if keyboard:
+        payload["reply_markup"] = keyboard
+        
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        print("Error sending simple message:", e)
+        print("Error sending message:", e)
 
 def answer_callback_query(callback_query_id, text=""):
     url = f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery"
@@ -77,34 +58,35 @@ def listen_telegram_updates():
                         chat_id = result["message"]["chat"]["id"]
                         text = result["message"]["text"].strip()
                         
-                        # Commande de réinitialisation pour l'admin : /reset ID_CLIENT
+                        # Commande texte de secours /reset ID
                         if text.startswith("/reset"):
                             if chat_id == ADMIN_ID:
                                 parts = text.split()
                                 if len(parts) > 1:
-                                    target_id_str = parts[1]
                                     try:
-                                        target_id = int(target_id_str)
-                                        user_signal_counts[target_id] = 0
-                                        send_simple_message(chat_id, f"✅ Le compteur de l'utilisateur `{target_id}` a été réinitialisé à 0 avec succès !")
-                                        send_simple_message(target_id, "🎉 *COMPTE RECHARGÉ !*\n\nL'administrateur vient de réinitialiser vos accès. Vous pouvez à nouveau demander des signaux ! 🚀")
+                                        target_id = int(parts[1])
+                                        udata = get_user_data(target_id)
+                                        udata["used"] = 0
+                                        udata["limit"] = 20  # Recharge à 20 tours
+                                        send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a été rechargé avec un pack de 20 tours !")
+                                        send_message_with_keyboard(target_id, "🎉 *COMPTE RECHARGÉ !*\n\nL'administrateur vient de vous offrir un pack de *20 signaux* ! Vous pouvez à nouveau jouer 🚀", keyboard={"inline_keyboard": [[{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]]})
                                     except ValueError:
-                                        send_simple_message(chat_id, "❌ ID invalide. Utilisez : `/reset ID_NUMERIQUE`")
-                                else:
-                                    send_simple_message(chat_id, "❌ Veuillez spécifier l'ID. Exemple : `/reset 8286650559`")
-                            else:
-                                send_simple_message(chat_id, "❌ Vous n'avez pas les droits d'administrateur pour utiliser cette commande.")
+                                        send_message_with_keyboard(chat_id, "❌ ID invalide.")
+                            continue
                         
-                        elif text.startswith("/start"):
-                            if chat_id not in user_signal_counts:
-                                user_signal_counts[chat_id] = 0
-                                
+                        if text.startswith("/start"):
+                            get_user_data(chat_id)  # Initialise l'utilisateur
                             welcome_msg = (
                                 "🚀 *RUBBEN226 ASSURANCE* 🚀\n\n"
                                 "Ce bot analyse les données LuckyJet et envoie des prédictions avec un taux de réussite affiché pouvant atteindre 98% 📊🔥\n\n"
                                 "Appuyez sur le bouton ci-dessous pour générer un signal !"
                             )
-                            send_message_with_keyboard(chat_id, welcome_msg, is_blocked=False)
+                            kb = {
+                                "inline_keyboard": [
+                                    [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
+                                ]
+                            }
+                            send_message_with_keyboard(chat_id, welcome_msg, keyboard=kb)
                     
                     elif "callback_query" in result:
                         callback_query = result["callback_query"]
@@ -112,21 +94,62 @@ def listen_telegram_updates():
                         chat_id = callback_query["message"]["chat"]["id"]
                         data_action = callback_query.get("data")
                         
+                        # Action admin via bouton interactif
+                        if data_action.startswith("reset_"):
+                            if chat_id == ADMIN_ID:
+                                target_id = int(data_action.split("_")[1])
+                                udata = get_user_data(target_id)
+                                udata["used"] = 0
+                                udata["limit"] = 20  # Recharge à 20 tours
+                                answer_callback_query(callback_query_id, "Client rechargé avec 20 tours !")
+                                
+                                # Confirmer à l'admin
+                                send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a reçu son pack de 20 tours.")
+                                # Informer le client
+                                send_message_with_keyboard(
+                                    target_id, 
+                                    "🎉 *COMPTE RECHARGÉ !*\n\nL'administrateur vient de vous offrir un pack de *20 signaux* ! Vous pouvez à nouveau jouer 🚀",
+                                    keyboard={"inline_keyboard": [[{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]]}
+                                )
+                            else:
+                                answer_callback_query(callback_query_id, "Action réservée à l'admin !")
+                            continue
+                        
                         if data_action == "get_signal":
-                            current_count = user_signal_counts.get(chat_id, 0)
+                            udata = get_user_data(chat_id)
+                            current_used = udata["used"]
+                            current_limit = udata["limit"]
                             
-                            if current_count >= MAX_FREE_SIGNALS:
+                            if current_used >= current_limit:
                                 answer_callback_query(callback_query_id, "Limite atteinte !")
                                 blocked_msg = (
                                     "⚠️ *VOS SIGNAUX SONT TERMINÉS*\n\n"
-                                    f"_Vous avez utilisé vos {MAX_FREE_SIGNALS} signaux gratuits._\n\n"
-                                    "🔥 *Pour obtenir de nouveaux signaux, contactez l'administrateur :*\n\n"
-                                    "👉 [Cliquez ici pour contacter l'admin](https://t.me/+tzWgZ8RnLog0NTc0)"
+                                    f"_Vous avez épuisé vos signaux disponibles._\n\n"
+                                    "🔥 *Pour obtenir de nouveaux signaux, rejoignez notre canal et contactez l'admin :*\n\n"
+                                    "👉 [Rejoindre le canal](https://t.me/+tzWgZ8RnLog0NTc0)"
                                 )
-                                send_message_with_keyboard(chat_id, blocked_msg, is_blocked=True)
+                                kb_blocked = {
+                                    "inline_keyboard": [
+                                        [{"text": "💬 CONTACTER L'ADMIN", "url": "https://t.me/+tzWgZ8RnLog0NTc0"}]
+                                    ]
+                                }
+                                send_message_with_keyboard(chat_id, blocked_msg, keyboard=kb_blocked)
+                                
+                                # NOTIFICATION ADMIN avec le bouton de réinitialisation directe à 20 tours !
+                                admin_alert = (
+                                    f"🔔 *NOUVEL UTILISATEUR BLOQUÉ*\n\n"
+                                    f"L'utilisateur ID : `{chat_id}` a épuisé ses signaux et demande une recharge."
+                                )
+                                admin_kb = {
+                                    "inline_keyboard": [
+                                        [{"text": "🔄 RECHARGER (20 TOURS)", "callback_data": f"reset_{chat_id}"}]
+                                    ]
+                                }
+                                send_message_with_keyboard(ADMIN_ID, admin_alert, keyboard=admin_kb)
+                                
                             else:
-                                user_signal_counts[chat_id] = current_count + 1
-                                remaining = MAX_FREE_SIGNALS - user_signal_counts[chat_id]
+                                udata["used"] = current_used + 1
+                                remaining = current_limit - udata["used"]
                                 
                                 answer_callback_query(callback_query_id, f"Signal généré ! ({remaining} restants)")
                                 
@@ -144,7 +167,12 @@ def listen_telegram_updates():
                                     "Inscrivez-vous sur 1win avec le code promo *RUBB225* :\n"
                                     "👉 [Lien d'inscription](https://1win.ci/casino?p=4kpi)"
                                 )
-                                send_message_with_keyboard(chat_id, signal_msg, is_blocked=False)
+                                kb_signal = {
+                                    "inline_keyboard": [
+                                        [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
+                                    ]
+                                }
+                                send_message_with_keyboard(chat_id, signal_msg, keyboard=kb_signal)
                             
         except Exception as e:
             print("Error in listen loop:", e)
