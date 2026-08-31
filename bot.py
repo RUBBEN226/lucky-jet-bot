@@ -1,4 +1,3 @@
-
 import time
 import threading
 import requests
@@ -8,6 +7,7 @@ from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
+ADMIN_ID = 8286650559  # Votre ID administrateur
 
 # Dictionnaire pour compter les signaux par utilisateur
 user_signal_counts = {}
@@ -40,6 +40,18 @@ def send_message_with_keyboard(chat_id, text, is_blocked=False):
     except Exception as e:
         print("Error sending message:", e)
 
+def send_simple_message(chat_id, text):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown"
+    }
+    try:
+        requests.post(url, json=payload, timeout=10)
+    except Exception as e:
+        print("Error sending simple message:", e)
+
 def answer_callback_query(callback_query_id, text=""):
     url = f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery"
     payload = {"callback_query_id": callback_query_id, "text": text, "show_alert": False}
@@ -65,7 +77,25 @@ def listen_telegram_updates():
                         chat_id = result["message"]["chat"]["id"]
                         text = result["message"]["text"].strip()
                         
-                        if text.startswith("/start"):
+                        # Commande de réinitialisation pour l'admin : /reset ID_CLIENT
+                        if text.startswith("/reset"):
+                            if chat_id == ADMIN_ID:
+                                parts = text.split()
+                                if len(parts) > 1:
+                                    target_id_str = parts[1]
+                                    try:
+                                        target_id = int(target_id_str)
+                                        user_signal_counts[target_id] = 0
+                                        send_simple_message(chat_id, f"✅ Le compteur de l'utilisateur `{target_id}` a été réinitialisé à 0 avec succès !")
+                                        send_simple_message(target_id, "🎉 *COMPTE RECHARGÉ !*\n\nL'administrateur vient de réinitialiser vos accès. Vous pouvez à nouveau demander des signaux ! 🚀")
+                                    except ValueError:
+                                        send_simple_message(chat_id, "❌ ID invalide. Utilisez : `/reset ID_NUMERIQUE`")
+                                else:
+                                    send_simple_message(chat_id, "❌ Veuillez spécifier l'ID. Exemple : `/reset 8286650559`")
+                            else:
+                                send_simple_message(chat_id, "❌ Vous n'avez pas les droits d'administrateur pour utiliser cette commande.")
+                        
+                        elif text.startswith("/start"):
                             if chat_id not in user_signal_counts:
                                 user_signal_counts[chat_id] = 0
                                 
