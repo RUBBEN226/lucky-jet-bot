@@ -1,116 +1,69 @@
-import asyncio
-import datetime
-import json
-import websockets
+
+import time
+import threading
 import requests
 import os
-import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# Telegram Credentials
+TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
+
+def send_message(chat_id, text):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown"
+    }
+    try:
+        requests.post(url, json=payload)
+    except Exception as e:
+        print("Erreur d'envoi :", e)
+
+def listen_telegram_updates():
+    offset = 0
+    print("Démarrage de l'écoute des messages Telegram...")
+    while True:
+        try:
+            url = f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset={offset}&timeout=30"
+            response = requests.get(url)
+            data = response.json()
+            
+            if data.get("ok"):
+                for result in data.get("result", []):
+                    offset = result["update_id"] + 1
+                    
+                    if "message" in result and "text" in result["message"]:
+                        chat_id = result["message"]["chat"]["id"]
+                        text = result["message"]["text"].strip()
+                        
+                        # Réaction à la commande /start ou autres
+                        if text.startswith("/start"):
+                            welcome_msg = (
+                                "🚀 *Bienvenue sur le bot Lucky Jet & 1win* 🚀\n\n"
+                                "Restez concentrés, gérez votre capital et ne cédez pas à la panique avec vos émotions !\n\n"
+                                "Inscrivez-vous dès maintenant sur 1win et profitez de vos avantages avec le code promo : *RUBB225*\n"
+                                "👉 [Cliquez ici pour vous inscrire](https://1win.ci/casino?p=4kpi)"
+                            )
+                            send_message(chat_id, welcome_msg)
+                            
+        except Exception as e:
+            print("Erreur dans la boucle d'écoute :", e)
+            time.sleep(5)
+
+# Lancer l'écoute Telegram dans un thread séparé
+threading.Thread(target=listen_telegram_updates, daemon=True).start()
+
+# --- Serveur Web pour Render ---
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"Bot is running!")
-def run_web_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
-    server.serve_forever()
-
-threading.Thread(target=run_web_server, daemon=True).start()
-
 
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# Lancer le serveur web en arrière-plan pour Render
 threading.Thread(target=run_web_server, daemon=True).start()
-
-CONFIG = {
-    "promoCode": "RUBB225",
-    "registrationLink": "https://1win.ci/casino?p=4kpi",
-    "apiUrl": "wss://api.example.com/luckyjet",
-    "targetMultiplier": 1.50,
-    "telegramToken": "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c",
-    "telegramChatId": "8286650559"
-}
-
-class LuckyJetBot:
-    def __init__(self):
-        self.is_running = False
-
-    async def start(self):
-        self.is_running = True
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{current_time}] [BOT] Démarrage réussi avec le code promo : {CONFIG['promoCode']}")
-        
-        welcome_message = (
-            f"🚀 **Bienvenue sur le Bot Lucky Jet !**\n"
-            f"📅 Date de démarrage : {current_time}\n\n"
-            f"⚠️ **Condition d'accès :**\n"
-            f"Pour accéder au bot et recevoir les signaux, vous devez obligatoirement :\n"
-            f"1. Vous inscrire via notre lien officiel : {CONFIG['registrationLink']}\n"
-            f"2. Utiliser le code promo : `{CONFIG['promoCode']}`\n"
-            f"3. Effectuer votre premier dépôt pour valider votre compte.\n\n"
-            f"🛡️ **Jeu Responsable :**\n"
-            f"Le jeu comporte des risques. Ne jouez jamais avec de l'argent dont vous avez besoin pour vos besoins essentiels, et ne jouez jamais sous le coup des émotions. Restez maître de vous !\n\n"
-            f"Bonne chance à tous !"
-        )
-        self.send_telegram_message(welcome_message)
-        await self.connect_websocket()
-
-    def send_telegram_message(self, message):
-        try:
-            url = f"https://api.telegram.org/bot{CONFIG['telegramToken']}/sendMessage"
-            payload = {
-                "chat_id": CONFIG['telegramChatId'],
-                "text": message,
-                "parse_mode": "Markdown",
-                "disable_web_page_preview": True
-            }
-            response = requests.post(url, json=payload)
-            return response.json()
-        except Exception as e:
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[{current_time}] [TELEGRAM] Erreur d'envoi : {e}")
-
-    async def connect_websocket(self):
-        while self.is_running:
-            try:
-                async with websockets.connect(CONFIG["apiUrl"]) as ws:
-                    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    print(f"[{current_time}] [SOCKET] Connecté au serveur Lucky Jet.")
-                    async for message in ws:
-                        await self.handle_game_data(json.loads(message))
-            except websockets.exceptions.ConnectionClosed:
-                current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                print(f"[{current_time}] [SOCKET] Connexion perdue. Reconnexion dans 5 secondes...")
-                await asyncio.sleep(5)
-            except Exception as e:
-                current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                print(f"[{current_time}] [SOCKET] Erreur : {e}")
-                await asyncio.sleep(5)
-
-    async def handle_game_data(self, packet):
-        if packet.get("event") == "crash":
-            multiplier = packet.get('multiplier', 0)
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[{current_time}] [JEU] Vol terminé à {multiplier}x")
-            
-            if multiplier and float(multiplier) < CONFIG["targetMultiplier"]:
-                msg = (
-                    f"⚠️ Crash bas ({multiplier}x) à {current_time}.\n"
-                    f"Rappel : Jouez avec modération et gardez le contrôle de vos émotions.\n"
-                    f"Inscrivez-vous sur {CONFIG['registrationLink']} avec le code `{CONFIG['promoCode']}` "
-                    f"et faites un dépôt pour continuer à profiter du bot en toute sécurité !"
-                )
-                print(f"[ASTUCE] {msg}")
-                self.send_telegram_message(msg)
-
-async def main():
-    bot = LuckyJetBot()
-    await bot.start()
-
-if __name__ == "__main__":
-    asyncio.run(main())
