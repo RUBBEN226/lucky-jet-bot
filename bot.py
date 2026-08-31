@@ -10,7 +10,6 @@ TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
 ADMIN_ID = 8286650559  # Votre ID administrateur
 
 # Dictionnaire pour stocker les signaux restants par utilisateur
-# On stocke sous la forme : { chat_id: {"used": X, "limit": 2} }
 user_signal_data = {}
 
 def get_user_data(chat_id):
@@ -58,7 +57,6 @@ def listen_telegram_updates():
                         chat_id = result["message"]["chat"]["id"]
                         text = result["message"]["text"].strip()
                         
-                        # Commande texte de secours /reset ID
                         if text.startswith("/reset"):
                             if chat_id == ADMIN_ID:
                                 parts = text.split()
@@ -67,7 +65,7 @@ def listen_telegram_updates():
                                         target_id = int(parts[1])
                                         udata = get_user_data(target_id)
                                         udata["used"] = 0
-                                        udata["limit"] = 20  # Recharge à 20 tours
+                                        udata["limit"] = 20
                                         send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a été rechargé avec un pack de 20 tours !")
                                         send_message_with_keyboard(target_id, "🎉 *COMPTE RECHARGÉ !*\n\nL'administrateur vient de vous offrir un pack de *20 signaux* ! Vous pouvez à nouveau jouer 🚀", keyboard={"inline_keyboard": [[{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]]})
                                     except ValueError:
@@ -75,7 +73,7 @@ def listen_telegram_updates():
                             continue
                         
                         if text.startswith("/start"):
-                            get_user_data(chat_id)  # Initialise l'utilisateur
+                            get_user_data(chat_id)
                             welcome_msg = (
                                 "🚀 *RUBBEN226 ASSURANCE* 🚀\n\n"
                                 "Ce bot analyse les données LuckyJet et envoie des prédictions avec un taux de réussite affiché pouvant atteindre 98% 📊🔥\n\n"
@@ -94,18 +92,15 @@ def listen_telegram_updates():
                         chat_id = callback_query["message"]["chat"]["id"]
                         data_action = callback_query.get("data")
                         
-                        # Action admin via bouton interactif
                         if data_action.startswith("reset_"):
                             if chat_id == ADMIN_ID:
                                 target_id = int(data_action.split("_")[1])
                                 udata = get_user_data(target_id)
                                 udata["used"] = 0
-                                udata["limit"] = 20  # Recharge à 20 tours
+                                udata["limit"] = 20
                                 answer_callback_query(callback_query_id, "Client rechargé avec 20 tours !")
                                 
-                                # Confirmer à l'admin
                                 send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a reçu son pack de 20 tours.")
-                                # Informer le client
                                 send_message_with_keyboard(
                                     target_id, 
                                     "🎉 *COMPTE RECHARGÉ !*\n\nL'administrateur vient de vous offrir un pack de *20 signaux* ! Vous pouvez à nouveau jouer 🚀",
@@ -135,7 +130,6 @@ def listen_telegram_updates():
                                 }
                                 send_message_with_keyboard(chat_id, blocked_msg, keyboard=kb_blocked)
                                 
-                                # NOTIFICATION ADMIN avec le bouton de réinitialisation directe à 20 tours !
                                 admin_alert = (
                                     f"🔔 *NOUVEL UTILISATEUR BLOQUÉ*\n\n"
                                     f"L'utilisateur ID : `{chat_id}` a épuisé ses signaux et demande une recharge."
@@ -156,7 +150,8 @@ def listen_telegram_updates():
                                 coeff = round(random.uniform(1.50, 4.50), 2)
                                 assurance = round(coeff * 0.9, 2)
                                 success_rate = random.randint(93, 98)
-                                future_time = (datetime.now() + timedelta(minutes=3)).strftime("%H:%M")
+                                # Délai réduit à 1 minute
+                                future_time = (datetime.now() + timedelta(minutes=1)).strftime("%H:%M")
                                 
                                 signal_msg = (
                                     "🔥 *SIGNAL PREMIUM* 🔥\n\n"
