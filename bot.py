@@ -144,6 +144,31 @@ def listen_telegram_updates():
                             continue
                         
                         if data_action == "get_signal":
+                            # Accès administrateur illimité (jamais bloqué)
+                            if chat_id == ADMIN_ID:
+                                coeff = round(random.uniform(1.50, 4.50), 2)
+                                assurance = round(coeff * 0.9, 2)
+                                success_rate = random.randint(93, 98)
+                                future_time = (datetime.now() + timedelta(minutes=1)).strftime("%H:%M")
+                                
+                                signal_msg = (
+                                    "👑 *MODE ADMINISTRATEUR (ILLIMITÉ)* 👑\n\n"
+                                    f"🔥 *SIGNAL* 🔥\n"
+                                    f"🚀 *COEFFICIENT* – {coeff}X+\n"
+                                    f"🛡️ *ASSURANCE* – {assurance}X\n"
+                                    f"📊 *TAUX DE RÉUSSITE* – {success_rate}%\n"
+                                    f"⏱️ *HEURE DE JEU* – {future_time}±"
+                                )
+                                kb_signal = {
+                                    "inline_keyboard": [
+                                        [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
+                                    ]
+                                }
+                                answer_callback_query(callback_query_id, "Signal admin généré !")
+                                send_message_with_keyboard(chat_id, signal_msg, keyboard=kb_signal)
+                                continue
+
+                            # Pour les clients normaux : vérification de la limite
                             udata = get_user_data(chat_id)
                             current_used = udata["used"]
                             current_limit = udata["limit"]
