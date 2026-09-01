@@ -150,7 +150,6 @@ def listen_telegram_updates():
                                 coeff = round(random.uniform(1.50, 4.50), 2)
                                 assurance = round(coeff * 0.9, 2)
                                 success_rate = random.randint(93, 98)
-                                # Délai réduit à 1 minute
                                 future_time = (datetime.now() + timedelta(minutes=1)).strftime("%H:%M")
                                 
                                 signal_msg = (
@@ -188,5 +187,7 @@ def run_web_server():
     server.serve_forever()
 
 if __name__ == "__main__":
+    # Démarrage du bot Telegram en arrière-plan
     threading.Thread(target=listen_telegram_updates, daemon=True).start()
+    # Démarrage immédiat du serveur web sur le thread principal pour satisfaire Render
     run_web_server()
