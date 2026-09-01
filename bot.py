@@ -14,7 +14,7 @@ user_signal_data = {}
 
 def get_user_data(chat_id):
     if chat_id not in user_signal_data:
-        user_signal_data[chat_id] = {"used": 0, "limit": 2}
+        user_signal_data[chat_id] = {"used": 0, "limit": 2, "waiting_deposit": False}
     return user_signal_data[chat_id]
 
 def send_message_with_keyboard(chat_id, text, keyboard=None):
@@ -53,38 +53,56 @@ def listen_telegram_updates():
                 for result in data.get("result", []):
                     offset = result["update_id"] + 1
                     
-                    if "message" in result and "text" in result["message"]:
-                        chat_id = result["message"]["chat"]["id"]
-                        text = result["message"]["text"].strip()
+                    if "message" in result:
+                        msg = result["message"]
+                        chat_id = msg["chat"]["id"]
                         
-                        if text.startswith("/reset"):
-                            if chat_id == ADMIN_ID:
-                                parts = text.split()
-                                if len(parts) > 1:
-                                    try:
-                                        target_id = int(parts[1])
-                                        udata = get_user_data(target_id)
-                                        udata["used"] = 0
-                                        udata["limit"] = 20
-                                        send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a été rechargé avec un pack de 20 tours !")
-                                        send_message_with_keyboard(target_id, "🎉 *COMPTE RECHARGÉ !*\n\nL'administrateur vient de vous offrir un pack de *20 signaux* ! Vous pouvez à nouveau jouer 🚀", keyboard={"inline_keyboard": [[{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]]})
-                                    except ValueError:
-                                        send_message_with_keyboard(chat_id, "❌ ID invalide.")
-                            continue
-                        
-                        if text.startswith("/start"):
-                            get_user_data(chat_id)
-                            welcome_msg = (
-                                "🚀 *RUBBEN226 ASSURANCE* 🚀\n\n"
-                                "Ce bot analyse les données LuckyJet et envoie des prédictions avec un taux de réussite affiché pouvant atteindre 98% 📊🔥\n\n"
-                                "Appuyez sur le bouton ci-dessous pour générer un signal !"
-                            )
-                            kb = {
-                                "inline_keyboard": [
-                                    [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
-                                ]
-                            }
-                            send_message_with_keyboard(chat_id, welcome_msg, keyboard=kb)
+                        # Gestion des photos ou messages texte de vérification de dépôt envoyés par l'utilisateur
+                        if chat_id != ADMIN_ID:
+                            udata = get_user_data(chat_id)
+                            if udata.get("waiting_deposit"):
+                                # Transférer la preuve (photo ou texte) à l'admin
+                                forward_url = f"https://api.telegram.org/bot{TOKEN}/forwardMessage"
+                                requests.post(forward_url, json={
+                                    "chat_id": ADMIN_ID,
+                                    "from_chat_id": chat_id,
+                                    "message_id": msg["message_id"]
+                                })
+                                
+                                # Alerter l'admin avec un bouton de validation
+                                admin_alert = (
+                                    f"📥 *PREUVE DE DÉPÔT REÇUE*\n\n"
+                                    f"De l'utilisateur ID : `{chat_id}`\n"
+                                    "Vérifiez la capture ci-dessus sur votre tableau de bord partenaire, puis validez :"
+                                )
+                                admin_kb = {
+                                    "inline_keyboard": [
+                                        [{"text": "✅ VALIDER ET OFFRIR 20 TOURS", "callback_data": f"reset_{chat_id}"}],
+                                        [{"text": "❌ REJETER", "callback_data": f"reject_{chat_id}"}]
+                                    ]
+                                }
+                                send_message_with_keyboard(ADMIN_ID, admin_alert, keyboard=admin_kb)
+                                
+                                send_message_with_keyboard(chat_id, "⏳ *Preuve bien reçue !*\n\nL'administrateur va vérifier votre dépôt sur le système et rechargera votre compte sous peu.")
+                                udata["waiting_deposit"] = False
+                                continue
+
+                        if "text" in msg:
+                            text = msg["text"].strip()
+                            
+                            if text.startswith("/start"):
+                                get_user_data(chat_id)
+                                welcome_msg = (
+                                    "🚀 *RUBBEN226 ASSURANCE* 🚀\n\n"
+                                    "Ce bot analyse les données LuckyJet et envoie des prédictions avec un taux de réussite affiché pouvant atteindre 98% 📊🔥\n\n"
+                                    "Appuyez sur le bouton ci-dessous pour générer un signal !"
+                                )
+                                kb = {
+                                    "inline_keyboard": [
+                                        [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
+                                    ]
+                                }
+                                send_message_with_keyboard(chat_id, welcome_msg, keyboard=kb)
                     
                     elif "callback_query" in result:
                         callback_query = result["callback_query"]
@@ -103,11 +121,26 @@ def listen_telegram_updates():
                                 send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a reçu son pack de 20 tours.")
                                 send_message_with_keyboard(
                                     target_id, 
-                                    "🎉 *COMPTE RECHARGÉ !*\n\nL'administrateur vient de vous offrir un pack de *20 signaux* ! Vous pouvez à nouveau jouer 🚀",
+                                    "🎉 *DÉPÔT VALIDÉ & COMPTE RECHARGÉ !*\n\nL'administrateur a validé votre inscription/dépôt. Vous avez reçu un pack de *20 signaux* ! Vous pouvez jouer 🚀",
                                     keyboard={"inline_keyboard": [[{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]]}
                                 )
                             else:
                                 answer_callback_query(callback_query_id, "Action réservée à l'admin !")
+                            continue
+                            
+                        if data_action.startswith("reject_"):
+                            if chat_id == ADMIN_ID:
+                                target_id = int(data_action.split("_")[1])
+                                answer_callback_query(callback_query_id, "Rejeté.")
+                                send_message_with_keyboard(chat_id, f"❌ Demande de l'utilisateur `{target_id}` rejetée.")
+                                send_message_with_keyboard(target_id, "❌ *Vérification échouée*\n\nAucun dépôt valide n'a été trouvé avec votre compte. Veuillez vous inscrire avec le code promo et effectuer un dépôt pour obtenir vos signaux.")
+                            continue
+                        
+                        if data_action == "i_deposited":
+                            answer_callback_query(callback_query_id, "Envoyez votre capture !")
+                            udata = get_user_data(chat_id)
+                            udata["waiting_deposit"] = True
+                            send_message_with_keyboard(chat_id, "📸 *ENVOYEZ LA PREUVE*\n\nVeuillez envoyer maintenant une **capture d'écran** de votre ID de joueur ou de votre reçu de dépôt dans cette conversation.")
                             continue
                         
                         if data_action == "get_signal":
@@ -119,27 +152,19 @@ def listen_telegram_updates():
                                 answer_callback_query(callback_query_id, "Limite atteinte !")
                                 blocked_msg = (
                                     "⚠️ *VOS SIGNAUX SONT TERMINÉS*\n\n"
-                                    f"_Vous avez épuisé vos signaux disponibles._\n\n"
-                                    "🔥 *Pour obtenir de nouveaux signaux, rejoignez notre canal et contactez l'admin :*\n\n"
-                                    "👉 [Rejoindre le canal](https://t.me/+tzWgZ8RnLog0NTc0)"
+                                    "_Vous avez épuisé vos signaux disponibles._\n\n"
+                                    "🔥 *Pour obtenir 20 nouveaux signaux gratuits :*\n"
+                                    "1. Inscrivez-vous avec le code promo *RUBB225*\n"
+                                    "2. Faites votre premier dépôt\n"
+                                    "3. Cliquez sur le bouton ci-dessous pour envoyer votre preuve !"
                                 )
                                 kb_blocked = {
                                     "inline_keyboard": [
+                                        [{"text": "🎁 J'AI FAIT UN DÉPÔT", "callback_data": "i_deposited"}],
                                         [{"text": "💬 CONTACTER L'ADMIN", "url": "https://t.me/+tzWgZ8RnLog0NTc0"}]
                                     ]
                                 }
                                 send_message_with_keyboard(chat_id, blocked_msg, keyboard=kb_blocked)
-                                
-                                admin_alert = (
-                                    f"🔔 *NOUVEL UTILISATEUR BLOQUÉ*\n\n"
-                                    f"L'utilisateur ID : `{chat_id}` a épuisé ses signaux et demande une recharge."
-                                )
-                                admin_kb = {
-                                    "inline_keyboard": [
-                                        [{"text": "🔄 RECHARGER (20 TOURS)", "callback_data": f"reset_{chat_id}"}]
-                                    ]
-                                }
-                                send_message_with_keyboard(ADMIN_ID, admin_alert, keyboard=admin_kb)
                                 
                             else:
                                 udata["used"] = current_used + 1
@@ -158,7 +183,7 @@ def listen_telegram_updates():
                                     f"🛡️ *ASSURANCE* – {assurance}X\n"
                                     f"📊 *TAUX DE RÉUSSITE* – {success_rate}%\n"
                                     f"⏱️ *HEURE DE JEU* – {future_time}±\n\n"
-                                    "Inscrivez-vous sur 1win avec le code promo *RUBB225* :\n"
+                                    "Inscrivez-vous avec le code promo *RUBB225* :\n"
                                     "👉 [Lien d'inscription](https://1win.ci/casino?p=4kpi)"
                                 )
                                 kb_signal = {
@@ -187,7 +212,5 @@ def run_web_server():
     server.serve_forever()
 
 if __name__ == "__main__":
-    # Démarrage du bot Telegram en arrière-plan
     threading.Thread(target=listen_telegram_updates, daemon=True).start()
-    # Démarrage immédiat du serveur web sur le thread principal pour satisfaire Render
     run_web_server()
