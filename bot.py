@@ -9,12 +9,12 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
 ADMIN_ID = 8286650559  # Votre ID administrateur
 
-# Dictionnaire pour stocker les signaux restants par utilisateur
+# Dictionnaire pour stocker les données par utilisateur (compteur de signaux et heure du dernier signal)
 user_signal_data = {}
 
 def get_user_data(chat_id):
     if chat_id not in user_signal_data:
-        user_signal_data[chat_id] = {"used": 0, "limit": 2, "waiting_deposit": False}
+        user_signal_data[chat_id] = {"used": 0, "limit": 2, "waiting_deposit": False, "last_minute": 0}
     return user_signal_data[chat_id]
 
 def send_message_with_keyboard(chat_id, text, keyboard=None):
@@ -119,7 +119,7 @@ def listen_telegram_updates():
                                 target_id = int(data_action.split("_")[1])
                                 udata = get_user_data(target_id)
                                 udata["used"] = 0
-                                udata["limit"] = 50  # Mis à 50 tours validés !
+                                udata["limit"] = 50
                                 answer_callback_query(callback_query_id, "Client rechargé avec 50 tours !")
                                 
                                 send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours.")
@@ -148,12 +148,17 @@ def listen_telegram_updates():
                             continue
                         
                         if data_action == "get_signal":
+                            udata = get_user_data(chat_id)
+                            
+                            # Génération d'une heure de jeu unique et décalée à chaque clic (entre 2 et 12 minutes dans le futur)
+                            add_mins = random.randint(2, 12)
+                            future_time = (datetime.now() + timedelta(minutes=add_mins)).strftime("%H:%M")
+                            
                             # Accès administrateur illimité (jamais bloqué)
                             if chat_id == ADMIN_ID:
                                 coeff = round(random.uniform(1.50, 4.50), 2)
                                 assurance = round(coeff * 0.9, 2)
                                 success_rate = random.randint(93, 98)
-                                future_time = (datetime.now() + timedelta(minutes=1)).strftime("%H:%M")
                                 
                                 signal_msg = (
                                     "👑 *MODE ADMINISTRATEUR (ILLIMITÉ)* 👑\n\n"
@@ -173,7 +178,6 @@ def listen_telegram_updates():
                                 continue
 
                             # Pour les clients normaux : vérification de la limite
-                            udata = get_user_data(chat_id)
                             current_used = udata["used"]
                             current_limit = udata["limit"]
                             
@@ -204,7 +208,6 @@ def listen_telegram_updates():
                                 coeff = round(random.uniform(1.50, 4.50), 2)
                                 assurance = round(coeff * 0.9, 2)
                                 success_rate = random.randint(93, 98)
-                                future_time = (datetime.now() + timedelta(minutes=1)).strftime("%H:%M")
                                 
                                 signal_msg = (
                                     "🔥 *SIGNAL PREMIUM* 🔥\n\n"
