@@ -9,12 +9,13 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
 ADMIN_ID = 8286650559  # Votre ID administrateur
 
-# Dictionnaire pour stocker les données par utilisateur (compteur de signaux et heure du dernier signal)
+# Dictionnaire pour stocker les données par utilisateur (compteur et dernière heure de jeu générée)
 user_signal_data = {}
 
 def get_user_data(chat_id):
     if chat_id not in user_signal_data:
-        user_signal_data[chat_id] = {"used": 0, "limit": 2, "waiting_deposit": False, "last_minute": 0}
+        # On mémorise la dernière heure générée pour l'empêcher de reculer
+        user_signal_data[chat_id] = {"used": 0, "limit": 2, "waiting_deposit": False, "last_signal_time": None}
     return user_signal_data[chat_id]
 
 def send_message_with_keyboard(chat_id, text, keyboard=None):
@@ -57,11 +58,10 @@ def listen_telegram_updates():
                         msg = result["message"]
                         chat_id = msg["chat"]["id"]
                         
-                        # Gestion des photos ou messages texte de vérification envoyés par l'utilisateur
+                        # Gestion de la réception de l'ID ou de la preuve
                         if chat_id != ADMIN_ID:
                             udata = get_user_data(chat_id)
                             if udata.get("waiting_deposit"):
-                                # Transférer la preuve à l'admin
                                 forward_url = f"https://api.telegram.org/bot{TOKEN}/forwardMessage"
                                 requests.post(forward_url, json={
                                     "chat_id": ADMIN_ID,
@@ -69,7 +69,6 @@ def listen_telegram_updates():
                                     "message_id": msg["message_id"]
                                 })
                                 
-                                # Alerter l'admin avec un bouton de validation
                                 admin_alert = (
                                     f"📥 *PREUVE DE DÉPÔT / ID REÇUE*\n\n"
                                     f"De l'utilisateur ID : `{chat_id}`\n"
@@ -120,6 +119,7 @@ def listen_telegram_updates():
                                 udata = get_user_data(target_id)
                                 udata["used"] = 0
                                 udata["limit"] = 50
+                                udata["last_signal_time"] = None
                                 answer_callback_query(callback_query_id, "Client rechargé avec 50 tours !")
                                 
                                 send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours.")
@@ -150,9 +150,19 @@ def listen_telegram_updates():
                         if data_action == "get_signal":
                             udata = get_user_data(chat_id)
                             
-                            # Génération d'une heure de jeu unique et décalée à chaque clic (entre 2 et 12 minutes dans le futur)
-                            add_mins = random.randint(2, 12)
-                            future_time = (datetime.now() + timedelta(minutes=add_mins)).strftime("%H:%M")
+                            # --- LOGIQUE D'HEURE PROGRESSIVE SANS RETOUR EN ARRIÈRE ---
+                            now = datetime.now()
+                            if udata["last_signal_time"] is None or udata["last_signal_time"] < now:
+                                # Si c'ur premier signal ou que le temps précédent est dépassé, on part de l'heure actuelle + 1 minute
+                                base_time = now + timedelta(minutes=1)
+                            else:
+                                # Si l'utilisateur reclique, on avance l'heure précédente de 1 à 2 minutes de plus
+                                add_mins = random.randint(1, 2)
+                                base_time = udata["last_signal_time"] + timedelta(minutes=add_mins)
+                            
+                            udata["last_signal_time"] = base_time
+                            future_time = base_time.strftime("%H:%M")
+                            # -----------------------------------------------------------
                             
                             # Accès administrateur illimité (jamais bloqué)
                             if chat_id == ADMIN_ID:
@@ -219,7 +229,7 @@ def listen_telegram_updates():
                                     "👉 [Lien d'inscription](https://1win.ci/casino?p=4kpi)"
                                 )
                                 kb_signal = {
-                                    "inline_keyboard": [
+                                 "inline_keyboard": [
                                         [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
                                     ]
                                 }
