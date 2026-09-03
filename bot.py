@@ -57,11 +57,11 @@ def listen_telegram_updates():
                         msg = result["message"]
                         chat_id = msg["chat"]["id"]
                         
-                        # Gestion des photos ou messages texte de vérification de dépôt envoyés par l'utilisateur
+                        # Gestion des photos ou messages texte de vérification envoyés par l'utilisateur
                         if chat_id != ADMIN_ID:
                             udata = get_user_data(chat_id)
                             if udata.get("waiting_deposit"):
-                                # Transférer la preuve (photo ou texte) à l'admin
+                                # Transférer la preuve à l'admin
                                 forward_url = f"https://api.telegram.org/bot{TOKEN}/forwardMessage"
                                 requests.post(forward_url, json={
                                     "chat_id": ADMIN_ID,
@@ -71,19 +71,19 @@ def listen_telegram_updates():
                                 
                                 # Alerter l'admin avec un bouton de validation
                                 admin_alert = (
-                                    f"📥 *PREUVE DE DÉPÔT REÇUE*\n\n"
+                                    f"📥 *PREUVE DE DÉPÔT / ID REÇUE*\n\n"
                                     f"De l'utilisateur ID : `{chat_id}`\n"
-                                    "Vérifiez la capture ci-dessus sur votre tableau de bord partenaire, puis validez :"
+                                    "Vérifiez l'ID ci-dessus sur votre tableau de bord partenaire, puis validez :"
                                 )
                                 admin_kb = {
                                     "inline_keyboard": [
-                                        [{"text": "✅ VALIDER ET OFFRIR 20 TOURS", "callback_data": f"reset_{chat_id}"}],
+                                        [{"text": "✅ VALIDER ET OFFRIR 50 TOURS", "callback_data": f"reset_{chat_id}"}],
                                         [{"text": "❌ REJETER", "callback_data": f"reject_{chat_id}"}]
                                     ]
                                 }
                                 send_message_with_keyboard(ADMIN_ID, admin_alert, keyboard=admin_kb)
                                 
-                                send_message_with_keyboard(chat_id, "⏳ *Preuve bien reçue !*\n\nL'administrateur va vérifier votre dépôt sur le système et rechargera votre compte sous peu.")
+                                send_message_with_keyboard(chat_id, "⏳ *ID / Preuve bien reçu !*\n\nL'administrateur va vérifier votre inscription avec le code promo **RUBB225** et rechargera votre compte avec 50 signaux sous peu.")
                                 udata["waiting_deposit"] = False
                                 continue
 
@@ -94,12 +94,16 @@ def listen_telegram_updates():
                                 get_user_data(chat_id)
                                 welcome_msg = (
                                     "🚀 *RUBBEN226 ASSURANCE* 🚀\n\n"
-                                    "Ce bot analyse les données LuckyJet et envoie des prédictions avec un taux de réussite affiché pouvant atteindre 98% 📊🔥\n\n"
-                                    "Appuyez sur le bouton ci-dessous pour générer un signal !"
+                                    "Bienvenue ! Pour activer votre robot 100% LuckyJet et obtenir vos signaux :\n\n"
+                                    "1️⃣ Inscrivez-vous avec le code promo *RUBB225*\n"
+                                    "2️⃣ Faites votre dépôt\n"
+                                    "3️⃣ Envoyez une capture d'écran de votre **ID 1win** ici pour confirmer et valider votre accès !\n\n"
+                                    "Appuyez sur le bouton ci-dessous pour commencer :"
                                 )
                                 kb = {
                                     "inline_keyboard": [
-                                        [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
+                                        [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}],
+                                        [{"text": "📸 ENVOYER MON ID / MA PREUVE", "callback_data": "i_deposited"}]
                                     ]
                                 }
                                 send_message_with_keyboard(chat_id, welcome_msg, keyboard=kb)
@@ -115,13 +119,13 @@ def listen_telegram_updates():
                                 target_id = int(data_action.split("_")[1])
                                 udata = get_user_data(target_id)
                                 udata["used"] = 0
-                                udata["limit"] = 20
-                                answer_callback_query(callback_query_id, "Client rechargé avec 20 tours !")
+                                udata["limit"] = 50  # Mis à 50 tours validés !
+                                answer_callback_query(callback_query_id, "Client rechargé avec 50 tours !")
                                 
-                                send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a reçu son pack de 20 tours.")
+                                send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours.")
                                 send_message_with_keyboard(
                                     target_id, 
-                                    "🎉 *DÉPÔT VALIDÉ & COMPTE RECHARGÉ !*\n\nL'administrateur a validé votre inscription/dépôt. Vous avez reçu un pack de *20 signaux* ! Vous pouvez jouer 🚀",
+                                    "🎉 *ACTIVATION VALIDÉE & COMPTE RECHARGÉ !*\n\nL'administrateur a validé votre ID 1win. Vous avez reçu un pack de *50 signaux* ! Vous pouvez jouer 🚀",
                                     keyboard={"inline_keyboard": [[{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]]}
                                 )
                             else:
@@ -133,14 +137,14 @@ def listen_telegram_updates():
                                 target_id = int(data_action.split("_")[1])
                                 answer_callback_query(callback_query_id, "Rejeté.")
                                 send_message_with_keyboard(chat_id, f"❌ Demande de l'utilisateur `{target_id}` rejetée.")
-                                send_message_with_keyboard(target_id, "❌ *Vérification échouée*\n\nAucun dépôt valide n'a été trouvé avec votre compte. Veuillez vous inscrire avec le code promo et effectuer un dépôt pour obtenir vos signaux.")
+                                send_message_with_keyboard(target_id, "❌ *Vérification échouée*\n\nL'ID ou le dépôt n'a pas pu être validé avec le code promo *RUBB225*. Veuillez réessayer.")
                             continue
                         
                         if data_action == "i_deposited":
-                            answer_callback_query(callback_query_id, "Envoyez votre capture !")
+                            answer_callback_query(callback_query_id, "Envoyez votre ID !")
                             udata = get_user_data(chat_id)
                             udata["waiting_deposit"] = True
-                            send_message_with_keyboard(chat_id, "📸 *ENVOYEZ LA PREUVE*\n\nVeuillez envoyer maintenant une **capture d'écran** de votre ID de joueur ou de votre reçu de dépôt dans cette conversation.")
+                            send_message_with_keyboard(chat_id, "📸 *ENVOYEZ VOTRE ID 1WIN*\n\nVeuillez envoyer maintenant une **capture d'écran de votre ID 1win** dans cette conversation pour valider votre accès au robot 100% LuckyJet.")
                             continue
                         
                         if data_action == "get_signal":
@@ -178,14 +182,14 @@ def listen_telegram_updates():
                                 blocked_msg = (
                                     "⚠️ *VOS SIGNAUX SONT TERMINÉS*\n\n"
                                     "_Vous avez épuisé vos signaux disponibles._\n\n"
-                                    "🔥 *Pour obtenir 20 nouveaux signaux gratuits :*\n"
+                                    "🔥 *Pour activer votre robot 100% LuckyJet et obtenir 50 nouveaux signaux :*\n"
                                     "1. Inscrivez-vous avec le code promo *RUBB225*\n"
-                                    "2. Faites votre premier dépôt\n"
-                                    "3. Cliquez sur le bouton ci-dessous pour envoyer votre preuve !"
+                                    "2. Faites votre dépôt\n"
+                                    "3. Cliquez sur le bouton ci-dessous pour envoyer votre capture d'ID 1win !"
                                 )
                                 kb_blocked = {
                                     "inline_keyboard": [
-                                        [{"text": "🎁 J'AI FAIT UN DÉPÔT", "callback_data": "i_deposited"}],
+                                        [{"text": "📸 ENVOYER MON ID 1WIN", "callback_data": "i_deposited"}],
                                         [{"text": "💬 CONTACTER L'ADMIN", "url": "https://t.me/+tzWgZ8RnLog0NTc0"}]
                                     ]
                                 }
