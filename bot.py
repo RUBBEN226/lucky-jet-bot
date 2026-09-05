@@ -9,25 +9,44 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 TOKEN = "8814245354:AAFh1xQaOWdnQhMM-lzq2xBaZ9etdXA5W6c"
 ADMIN_ID = 8286650559  # Votre ID administrateur
 
-# Dictionnaire pour stocker les données par utilisateur (compteur et dernière heure de jeu générée)
 user_signal_data = {}
 
 def get_user_data(chat_id):
     if chat_id not in user_signal_data:
-        # On mémorise la dernière heure générée pour l'empêcher de reculer
         user_signal_data[chat_id] = {"used": 0, "limit": 2, "waiting_deposit": False, "last_signal_time": None}
     return user_signal_data[chat_id]
 
-def send_message_with_keyboard(chat_id, text, keyboard=None):
+# Fonction pour envoyer un message avec un clavier persistant en bas (Menu principal)
+def send_main_menu(chat_id, text):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    keyboard = {
+        "keyboard": [
+            [{"text": "⚡ Obtenir un Signal ⚡"}, {"text": "📸 Envoyer mon ID 1Win"}],
+            [{"text": "📖 Guide Inscription (RUBB225)"}, {"text": "🆔 Mon ID Telegram"}],
+            [{"text": "🎁 Code Promo : RUBB225"}, {"text": "💬 Contacter l'Admin"}],
+            [{"text": "🔄 Vérifier mon Accès"}]
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True
+    }
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown",
+        "reply_markup": keyboard
+    }
+    try:
+        requests.post(url, json=payload, timeout=10)
+    except Exception as e:
+        print("Error sending message:", e)
+
+def send_message_simple(chat_id, text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text,
         "parse_mode": "Markdown"
     }
-    if keyboard:
-        payload["reply_markup"] = keyboard
-        
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
@@ -58,7 +77,7 @@ def listen_telegram_updates():
                         msg = result["message"]
                         chat_id = msg["chat"]["id"]
                         
-                        # Gestion de la réception de l'ID ou de la preuve
+                        # Gestion des photos ou textes de preuve de dépôt
                         if chat_id != ADMIN_ID:
                             udata = get_user_data(chat_id)
                             if udata.get("waiting_deposit"):
@@ -80,32 +99,131 @@ def listen_telegram_updates():
                                         [{"text": "❌ REJETER", "callback_data": f"reject_{chat_id}"}]
                                     ]
                                 }
-                                send_message_with_keyboard(ADMIN_ID, admin_alert, keyboard=admin_kb)
+                                requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
+                                    "chat_id": ADMIN_ID,
+                                    "text": admin_alert,
+                                    "parse_mode": "Markdown",
+                                    "reply_markup": admin_kb
+                                })
                                 
-                                send_message_with_keyboard(chat_id, "⏳ *ID / Preuve bien reçu !*\n\nL'administrateur va vérifier votre inscription avec le code promo **RUBB225** et rechargera votre compte avec 50 signaux sous peu.")
+                                send_main_menu(chat_id, "⏳ *ID / Preuve bien reçu !*\n\nL'administrateur va vérifier votre inscription avec le code promo **RUBB225** et rechargera votre compte avec 50 signaux sous peu.")
                                 udata["waiting_deposit"] = False
                                 continue
 
                         if "text" in msg:
                             text = msg["text"].strip()
+                            udata = get_user_data(chat_id)
                             
                             if text.startswith("/start"):
-                                get_user_data(chat_id)
                                 welcome_msg = (
                                     "🚀 *RUBBEN226 ASSURANCE* 🚀\n\n"
-                                    "Bienvenue ! Pour activer votre robot 100% LuckyJet et obtenir vos signaux :\n\n"
-                                    "1️⃣ Inscrivez-vous avec le code promo *RUBB225*\n"
-                                    "2️⃣ Faites votre dépôt\n"
-                                    "3️⃣ Envoyez une capture d'écran de votre **ID 1win** ici pour confirmer et valider votre accès !\n\n"
-                                    "Appuyez sur le bouton ci-dessous pour commencer :"
+                                    "Bienvenue ! Utilisez les boutons du menu en bas pour naviguer, obtenir vos signaux ou valider votre accès :"
                                 )
-                                kb = {
-                                    "inline_keyboard": [
-                                        [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}],
-                                        [{"text": "📸 ENVOYER MON ID / MA PREUVE", "callback_data": "i_deposited"}]
-                                    ]
-                                }
-                                send_message_with_keyboard(chat_id, welcome_msg, keyboard=kb)
+                                send_main_menu(chat_id, welcome_msg)
+                                continue
+                                
+                            elif text == "⚡ Obtenir un Signal ⚡":
+                                # Logique de génération d'heure progressive
+                                now = datetime.now()
+                                if udata["last_signal_time"] is None or udata["last_signal_time"] < now:
+                                    base_time = now + timedelta(minutes=1)
+                                else:
+                                    add_mins = random.randint(1, 2)
+                                    base_time = udata["last_signal_time"] + timedelta(minutes=add_mins)
+                                
+                                udata["last_signal_time"] = base_time
+                                future_time = base_time.strftime("%H:%M")
+                                
+                                if chat_id == ADMIN_ID:
+                                    coeff = round(random.uniform(1.50, 4.50), 2)
+                                    assurance = round(coeff * 0.9, 2)
+                                    success_rate = random.randint(93, 98)
+                                    
+                                    signal_msg = (
+                                        "👑 *MODE ADMINISTRATEUR (ILLIMITÉ)* 👑\n\n"
+                                        f"🔥 *SIGNAL* 🔥\n"
+                                        f"🚀 *COEFFICIENT* – {coeff}X+\n"
+                                        f"🛡️ *ASSURANCE* – {assurance}X\n"
+                                        f"📊 *TAUX DE RÉUSSITE* – {success_rate}%\n"
+                                        f"⏱️ *HEURE DE JEU* – {future_time}±"
+                                    )
+                                    send_main_menu(chat_id, signal_msg)
+                                    continue
+
+                                current_used = udata["used"]
+                                current_limit = udata["limit"]
+                                
+                                if current_used >= current_limit:
+                                    blocked_msg = (
+                                        "⚠️ *VOS SIGNAUX SONT TERMINÉS*\n\n"
+                                        "_Vous avez épuisé vos signaux disponibles._\n\n"
+                                        "🔥 *Pour activer votre robot 100% LuckyJet et obtenir 50 nouveaux signaux :*\n"
+                                        "1. Inscrivez-vous avec le code promo *RUBB225*\n"
+                                        "2. Faites votre dépôt\n"
+                                        "3. Cliquez sur 'Envoyer mon ID 1Win' ci-dessous !"
+                                    )
+                                    send_main_menu(chat_id, blocked_msg)
+                                else:
+                                    udata["used"] = current_used + 1
+                                    remaining = current_limit - udata["used"]
+                                    
+                                    coeff = round(random.uniform(1.50, 4.50), 2)
+                                    assurance = round(coeff * 0.9, 2)
+                                    success_rate = random.randint(93, 98)
+                                    
+                                    signal_msg = (
+                                        "🔥 *SIGNAL PREMIUM* 🔥\n\n"
+                                        f"🚀 *COEFFICIENT* – {coeff}X+\n"
+                                        f"🛡️ *ASSURANCE* – {assurance}X\n"
+                                        f"📊 *TAUX DE RÉUSSITE* – {success_rate}%\n"
+                                        f"⏱️ *HEURE DE JEU* – {future_time}±\n\n"
+                                        f"📊 *Signaux restants* : {remaining}\n\n"
+                                        "Inscrivez-vous avec le code promo *RUBB225* :\n"
+                                        "👉 [Lien d'inscription](https://1win.ci/casino?p=4kpi)"
+                                    )
+                                    send_main_menu(chat_id, signal_msg)
+                                continue
+                                
+                            elif text == "📸 Envoyer mon ID 1Win":
+                                udata["waiting_deposit"] = True
+                                send_main_menu(chat_id, "📸 *ENVOYEZ VOTRE ID 1WIN*\n\nVeuillez envoyer maintenant une **capture d'écran de votre ID 1win** ou votre numéro d'identifiant dans cette conversation.")
+                                continue
+                                
+                            elif text == "📖 Guide Inscription (RUBB225)":
+                                guide_msg = (
+                                    "📖 *GUIDE D'INSCRIPTION & ACTIVATION* 📖\n\n"
+                                    "1️⃣ Créez un compte sur 1Win en utilisant le code promo : `RUBB225`\n"
+                                    "2️⃣ Effectuez votre premier dépôt.\n"
+                                    "3️⃣ Cliquez sur **Envoyer mon ID 1Win** pour nous transmettre votre capture d'écran.\n"
+                                    "4️⃣ Recevez vos **50 signaux** après validation par l'administrateur !"
+                                )
+                                send_main_menu(chat_id, guide_msg)
+                                continue
+                                
+                            elif text == "🆔 Mon ID Telegram":
+                                send_main_menu(chat_id, f"🆔 Votre identifiant Telegram est : `{chat_id}`")
+                                continue
+                                
+                            elif text == "🎁 Code Promo : RUBB225":
+                                send_main_menu(chat_id, "🎁 *CODE PROMO OFFICIEL* :\n\nUtilisez le code `RUBB225` lors de votre inscription sur 1Win pour débloquer votre accès illimité au robot.")
+                                continue
+                                
+                            elif text == "💬 Contacter l'Admin":
+                                send_main_menu(chat_id, "💬 Pour contacter directement l'administrateur, écrivez ici : https://t.me/+tzWgZ8RnLog0NTc0")
+                                continue
+                                
+                            elif text == "🔄 Vérifier mon Accès":
+                                used = udata["used"]
+                                limit = udata["limit"]
+                                remaining = max(0, limit - used)
+                                status_msg = (
+                                    "📊 *STATUT DE VOTRE COMPTE*\n\n"
+                                    f"• Signaux utilisés : {used}/{limit}\n"
+                                    f"• Signaux restants : {remaining}\n"
+                                    f"• Mode : {'Administrateur 👑' if chat_id == ADMIN_ID else 'Membre Standard'}"
+                                )
+                                send_main_menu(chat_id, status_msg)
+                                continue
                     
                     elif "callback_query" in result:
                         callback_query = result["callback_query"]
@@ -122,11 +240,10 @@ def listen_telegram_updates():
                                 udata["last_signal_time"] = None
                                 answer_callback_query(callback_query_id, "Client rechargé avec 50 tours !")
                                 
-                                send_message_with_keyboard(chat_id, f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours.")
-                                send_message_with_keyboard(
+                                send_message_simple(chat_id, f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours.")
+                                send_main_menu(
                                     target_id, 
-                                    "🎉 *ACTIVATION VALIDÉE & COMPTE RECHARGÉ !*\n\nL'administrateur a validé votre ID 1win. Vous avez reçu un pack de *50 signaux* ! Vous pouvez jouer 🚀",
-                                    keyboard={"inline_keyboard": [[{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]]}
+                                    "🎉 *ACTIVATION VALIDÉE & COMPTE RECHARGÉ !*\n\nL'administrateur a validé votre ID 1win. Vous avez reçu un pack de *50 signaux* ! Vous pouvez jouer 🚀"
                                 )
                             else:
                                 answer_callback_query(callback_query_id, "Action réservée à l'admin !")
@@ -136,104 +253,9 @@ def listen_telegram_updates():
                             if chat_id == ADMIN_ID:
                                 target_id = int(data_action.split("_")[1])
                                 answer_callback_query(callback_query_id, "Rejeté.")
-                                send_message_with_keyboard(chat_id, f"❌ Demande de l'utilisateur `{target_id}` rejetée.")
-                                send_message_with_keyboard(target_id, "❌ *Vérification échouée*\n\nL'ID ou le dépôt n'a pas pu être validé avec le code promo *RUBB225*. Veuillez réessayer.")
+                                send_message_simple(chat_id, f"❌ Demande de l'utilisateur `{target_id}` rejetée.")
+                                send_main_menu(target_id, "❌ *Vérification échouée*\n\nL'ID ou le dépôt n'a pas pu être validé avec le code promo *RUBB225*. Veuillez réessayer.")
                             continue
-                        
-                        if data_action == "i_deposited":
-                            answer_callback_query(callback_query_id, "Envoyez votre ID !")
-                            udata = get_user_data(chat_id)
-                            udata["waiting_deposit"] = True
-                            send_message_with_keyboard(chat_id, "📸 *ENVOYEZ VOTRE ID 1WIN*\n\nVeuillez envoyer maintenant une **capture d'écran de votre ID 1win** dans cette conversation pour valider votre accès au robot 100% LuckyJet.")
-                            continue
-                        
-                        if data_action == "get_signal":
-                            udata = get_user_data(chat_id)
-                            
-                            # --- LOGIQUE D'HEURE PROGRESSIVE SANS RETOUR EN ARRIÈRE ---
-                            now = datetime.now()
-                            if udata["last_signal_time"] is None or udata["last_signal_time"] < now:
-                                # Si c'ur premier signal ou que le temps précédent est dépassé, on part de l'heure actuelle + 1 minute
-                                base_time = now + timedelta(minutes=1)
-                            else:
-                                # Si l'utilisateur reclique, on avance l'heure précédente de 1 à 2 minutes de plus
-                                add_mins = random.randint(1, 2)
-                                base_time = udata["last_signal_time"] + timedelta(minutes=add_mins)
-                            
-                            udata["last_signal_time"] = base_time
-                            future_time = base_time.strftime("%H:%M")
-                            # -----------------------------------------------------------
-                            
-                            # Accès administrateur illimité (jamais bloqué)
-                            if chat_id == ADMIN_ID:
-                                coeff = round(random.uniform(1.50, 4.50), 2)
-                                assurance = round(coeff * 0.9, 2)
-                                success_rate = random.randint(93, 98)
-                                
-                                signal_msg = (
-                                    "👑 *MODE ADMINISTRATEUR (ILLIMITÉ)* 👑\n\n"
-                                    f"🔥 *SIGNAL* 🔥\n"
-                                    f"🚀 *COEFFICIENT* – {coeff}X+\n"
-                                    f"🛡️ *ASSURANCE* – {assurance}X\n"
-                                    f"📊 *TAUX DE RÉUSSITE* – {success_rate}%\n"
-                                    f"⏱️ *HEURE DE JEU* – {future_time}±"
-                                )
-                                kb_signal = {
-                                    "inline_keyboard": [
-                                        [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
-                                    ]
-                                }
-                                answer_callback_query(callback_query_id, "Signal admin généré !")
-                                send_message_with_keyboard(chat_id, signal_msg, keyboard=kb_signal)
-                                continue
-
-                            # Pour les clients normaux : vérification de la limite
-                            current_used = udata["used"]
-                            current_limit = udata["limit"]
-                            
-                            if current_used >= current_limit:
-                                answer_callback_query(callback_query_id, "Limite atteinte !")
-                                blocked_msg = (
-                                    "⚠️ *VOS SIGNAUX SONT TERMINÉS*\n\n"
-                                    "_Vous avez épuisé vos signaux disponibles._\n\n"
-                                    "🔥 *Pour activer votre robot 100% LuckyJet et obtenir 50 nouveaux signaux :*\n"
-                                    "1. Inscrivez-vous avec le code promo *RUBB225*\n"
-                                    "2. Faites votre dépôt\n"
-                                    "3. Cliquez sur le bouton ci-dessous pour envoyer votre capture d'ID 1win !"
-                                )
-                                kb_blocked = {
-                                    "inline_keyboard": [
-                                        [{"text": "📸 ENVOYER MON ID 1WIN", "callback_data": "i_deposited"}],
-                                        [{"text": "💬 CONTACTER L'ADMIN", "url": "https://t.me/+tzWgZ8RnLog0NTc0"}]
-                                    ]
-                                }
-                                send_message_with_keyboard(chat_id, blocked_msg, keyboard=kb_blocked)
-                                
-                            else:
-                                udata["used"] = current_used + 1
-                                remaining = current_limit - udata["used"]
-                                
-                                answer_callback_query(callback_query_id, f"Signal généré ! ({remaining} restants)")
-                                
-                                coeff = round(random.uniform(1.50, 4.50), 2)
-                                assurance = round(coeff * 0.9, 2)
-                                success_rate = random.randint(93, 98)
-                                
-                                signal_msg = (
-                                    "🔥 *SIGNAL PREMIUM* 🔥\n\n"
-                                    f"🚀 *COEFFICIENT* – {coeff}X+\n"
-                                    f"🛡️ *ASSURANCE* – {assurance}X\n"
-                                    f"📊 *TAUX DE RÉUSSITE* – {success_rate}%\n"
-                                    f"⏱️ *HEURE DE JEU* – {future_time}±\n\n"
-                                    "Inscrivez-vous avec le code promo *RUBB225* :\n"
-                                    "👉 [Lien d'inscription](https://1win.ci/casino?p=4kpi)"
-                                )
-                                kb_signal = {
-                                 "inline_keyboard": [
-                                        [{"text": "🔥 DEMANDER UN SIGNAL", "callback_data": "get_signal"}]
-                                    ]
-                                }
-                                send_message_with_keyboard(chat_id, signal_msg, keyboard=kb_signal)
                             
         except Exception as e:
             print("Error in listen loop:", e)
