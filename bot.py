@@ -1,5 +1,10 @@
-Si le bouton « VALIDER ET OFFRIR 50 TOURS » ne réagit toujours pas (comme le montre votre capture d'écran où le message reste figé sans retour), c'est parce que la structure de la boucle for result in data.get("result", []) dans votre fonction listen_telegram_updates() traite les éléments de manière exclusive (avec des if / elif / continue) ou l'ordre des blocs bloque l'interception du callback_query.
-Voici le code corrigé et optimisé de la fonction listen_telegram_updates (et le script complet) où la vérification du callback_query est placée de façon isolée et prioritaire pour s'assurer qu'elle intercepte immédiatement le clic de l'administrateur :
+
+Si les messages normaux et les boutons du menu fonctionnent mais que le bouton **« VALIDER ET OFFRIR 50 TOURS »** reste complètement figé (sans même enlever le cercle de chargement sur Telegram), cela provient généralement de l'une de ces deux causes invisibles :
+ 1. **Un Webhook Telegram bloqué en arrière-plan :** Si ce token a déjà été utilisé sur un autre hébergeur ou script avec un webhook, Telegram envoie les clics de boutons (callback_query) vers cette ancienne adresse et **bloque** leur réception par votre script actuel (qui utilise le *polling* getUpdates).
+ 2. **L'absence de réponse immédiate à l'API :** Si Telegram n'envoie pas l'événement callback_query jusqu'au script, le code ne peut pas exécuter answerCallbackQuery, ce qui laisse le bouton bloqué visuellement pour l'administrateur.
+### La Solution : Forcer la suppression du Webhook au démarrage
+Ajoutez l'instruction deleteWebhook tout au début de la fonction listen_telegram_updates() pour nettoyer l'ancien canal de transmission de Telegram.
+Voici le script complet mis à jour avec cette correction indispensable :
 ```python
 import time
 import threading
@@ -53,6 +58,13 @@ def answer_callback_query(callback_query_id, text=""):
         print("Error answering callback:", e)
 
 def listen_telegram_updates():
+    # Nettoyage indispensable : supprime tout ancien webhook pour autoriser getUpdates
+    try:
+        requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook", timeout=5)
+        print("Webhook successfully cleared/reset.")
+    except Exception as e:
+        print("Could not clear webhook:", e)
+
     offset = 0
     print("Listening for Telegram updates...")
     while True:
@@ -65,7 +77,7 @@ def listen_telegram_updates():
                 for result in data.get("result", []):
                     offset = result["update_id"] + 1
                     
-                    # 1. Traitement prioritaire des clics sur les boutons interactifs (Inline Keyboards)
+                    # 1. Traitement prioritaire des clics sur les boutons inline (Admin)
                     if "callback_query" in result:
                         callback_query = result["callback_query"]
                         callback_query_id = callback_query["id"]
@@ -108,7 +120,7 @@ def listen_telegram_updates():
                                 answer_callback_query(callback_query_id, "Action réservée à l'admin !")
                             continue
                     
-                    # 2. Traitement des messages classiques
+                    # 2. Traitement des messages texte et médias classiques
                     if "message" in result:
                         msg = result["message"]
                         chat_id = msg["chat"]["id"]
@@ -283,3 +295,4 @@ if __name__ == "__main__":
     run_web_server()
 
 ```
+Redémarrez votre script avec ce code. L'appel à deleteWebhook va libérer les événements de boutons et permettre à votre script de recevoir enfin les clics sur les boutons interactifs.
