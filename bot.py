@@ -1,3 +1,6 @@
+Si le bouton « VALIDER ET OFFRIR 50 TOURS » ne réagit toujours pas (comme le montre votre capture d'écran où le message reste figé sans retour), c'est parce que la structure de la boucle for result in data.get("result", []) dans votre fonction listen_telegram_updates() traite les éléments de manière exclusive (avec des if / elif / continue) ou l'ordre des blocs bloque l'interception du callback_query.
+Voici le code corrigé et optimisé de la fonction listen_telegram_updates (et le script complet) où la vérification du callback_query est placée de façon isolée et prioritaire pour s'assurer qu'elle intercepte immédiatement le clic de l'administrateur :
+```python
 import time
 import threading
 import requests
@@ -62,11 +65,55 @@ def listen_telegram_updates():
                 for result in data.get("result", []):
                     offset = result["update_id"] + 1
                     
+                    # 1. Traitement prioritaire des clics sur les boutons interactifs (Inline Keyboards)
+                    if "callback_query" in result:
+                        callback_query = result["callback_query"]
+                        callback_query_id = callback_query["id"]
+                        chat_id = callback_query["message"]["chat"]["id"]
+                        data_action = callback_query.get("data", "")
+                        
+                        if data_action.startswith("reset_"):
+                            if chat_id == ADMIN_ID:
+                                target_id = int(data_action.split("_")[1])
+                                udata = get_user_data(target_id)
+                                udata["used"] = 0
+                                udata["limit"] = 50
+                                udata["last_signal_time"] = None
+                                answer_callback_query(callback_query_id, "Client rechargé avec 50 tours !")
+                                
+                                requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
+                                    "chat_id": ADMIN_ID,
+                                    "text": f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours.",
+                                    "parse_mode": "Markdown"
+                                })
+                                send_message_with_menu(
+                                    target_id, 
+                                    "🎉 *ACTIVATION VALIDÉE & COMPTE RECHARGÉ !*\n\nL'administrateur a validé votre ID 1win. Vous avez reçu un pack de *50 signaux* ! Vous pouvez jouer 🚀"
+                                )
+                            else:
+                                answer_callback_query(callback_query_id, "Action réservée à l'admin !")
+                            continue
+                            
+                        elif data_action.startswith("reject_"):
+                            if chat_id == ADMIN_ID:
+                                target_id = int(data_action.split("_")[1])
+                                answer_callback_query(callback_query_id, "Rejeté.")
+                                requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
+                                    "chat_id": ADMIN_ID,
+                                    "text": f"❌ Demande de l'utilisateur `{target_id}` rejetée.",
+                                    "parse_mode": "Markdown"
+                                })
+                                send_message_with_menu(target_id, "❌ *Vérification échouée*\n\nL'ID ou le dépôt n'a pas pu être validé avec le code promo *RUBB225*. Veuillez réessayer.")
+                            else:
+                                answer_callback_query(callback_query_id, "Action réservée à l'admin !")
+                            continue
+                    
+                    # 2. Traitement des messages classiques
                     if "message" in result:
                         msg = result["message"]
                         chat_id = msg["chat"]["id"]
                         
-                        # Gestion des preuves de dépôt / ID
+                        # Gestion des preuves de dépôt / ID envoyées par les utilisateurs
                         if chat_id != ADMIN_ID:
                             udata = get_user_data(chat_id)
                             if udata.get("waiting_deposit"):
@@ -212,46 +259,6 @@ def listen_telegram_updates():
                                 )
                                 send_message_with_menu(chat_id, status_msg)
                                 continue
-                    
-                    elif "callback_query" in result:
-                        callback_query = result["callback_query"]
-                        callback_query_id = callback_query["id"]
-                        chat_id = callback_query["message"]["chat"]["id"]
-                        data_action = callback_query.get("data")
-                        
-                        if data_action.startswith("reset_"):
-                            if chat_id == ADMIN_ID:
-                                target_id = int(data_action.split("_")[1])
-                                udata = get_user_data(target_id)
-                                udata["used"] = 0
-                                udata["limit"] = 50
-                                udata["last_signal_time"] = None
-                                answer_callback_query(callback_query_id, "Client rechargé avec 50 tours !")
-                                
-                                requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
-                                    "chat_id": ADMIN_ID,
-                                    "text": f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours.",
-                                    "parse_mode": "Markdown"
-                                })
-                                send_message_with_menu(
-                                    target_id, 
-                                    "🎉 *ACTIVATION VALIDÉE & COMPTE RECHARGÉ !*\n\nL'administrateur a validé votre ID 1win. Vous avez reçu un pack de *50 signaux* ! Vous pouvez jouer 🚀"
-                                )
-                            else:
-                                answer_callback_query(callback_query_id, "Action réservée à l'admin !")
-                            continue
-                            
-                        if data_action.startswith("reject_"):
-                            if chat_id == ADMIN_ID:
-                                target_id = int(data_action.split("_")[1])
-                                answer_callback_query(callback_query_id, "Rejeté.")
-                                requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
-                                    "chat_id": ADMIN_ID,
-                                    "text": f"❌ Demande de l'utilisateur `{target_id}` rejetée.",
-                                    "parse_mode": "Markdown"
-                                })
-                                send_message_with_menu(target_id, "❌ *Vérification échouée*\n\nL'ID ou le dépôt n'a pas pu être validé avec le code promo *RUBB225*. Veuillez réessayer.")
-                            continue
                             
         except Exception as e:
             print("Error in listen loop:", e)
@@ -274,3 +281,5 @@ def run_web_server():
 if __name__ == "__main__":
     threading.Thread(target=listen_telegram_updates, daemon=True).start()
     run_web_server()
+
+```
