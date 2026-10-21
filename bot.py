@@ -1,7 +1,4 @@
-L'erreur est visible dans vos journaux Render : SyntaxError: invalid character '«' (U+00AB).
-Python n'accepte pas les guillemets français (« ou ») dans le code source. Il faut utiliser uniquement des guillemets normaux (" ou ').
-Voici le script complet et entièrement corrigé, sans aucun caractère spécial susceptible de bloquer le déploiement :
-```python
+
 import time
 import threading
 import requests
@@ -284,5 +281,3 @@ def run_web_server():
 if __name__ == "__main__":
     threading.Thread(target=listen_telegram_updates, daemon=True).start()
     run_web_server()
-
-```
