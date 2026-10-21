@@ -1,4 +1,3 @@
-
 import time
 import threading
 import requests
@@ -191,7 +190,7 @@ def listen_telegram_updates():
                                 if current_used >= current_limit:
                                     blocked_msg = (
                                         "⚠️ *VOS SIGNAUX SONT TERMINES*\n\n"
-                                        "_Vous avez épuise vos signaux disponibles._\n\n"
+                                        "_Vous avez epuise vos signaux disponibles._\n\n"
                                         "🔥 *Pour activer votre robot 100% LuckyJet et obtenir 50 nouveaux signaux :*\n"
                                         "1. Inscrivez-vous avec le code promo *RUBB225*\n"
                                         "2. Faites votre depot\n"
