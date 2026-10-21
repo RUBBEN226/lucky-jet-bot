@@ -28,13 +28,13 @@ MAIN_MENU_KEYBOARD = {
     "is_persistent": True
 }
 
-def send_message_with_menu(chat_id, text):
+def send_message_with_menu(chat_id, text, keyboard=None):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text,
         "parse_mode": "Markdown",
-        "reply_markup": MAIN_MENU_KEYBOARD
+        "reply_markup": keyboard if keyboard else MAIN_MENU_KEYBOARD
     }
     try:
         requests.post(url, json=payload, timeout=10)
