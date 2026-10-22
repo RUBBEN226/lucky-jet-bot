@@ -13,7 +13,8 @@ user_signal_data = {}
 
 def get_user_data(chat_id):
     if chat_id not in user_signal_data:
-        user_signal_data[chat_id] = {"used": 0, "limit": 2, "waiting_deposit": False, "last_signal_time": None}
+        limit = 999999 if chat_id == ADMIN_ID else 2
+        user_signal_data[chat_id] = {"used": 0, "limit": limit, "waiting_deposit": False, "last_signal_time": None}
     return user_signal_data[chat_id]
 
 MAIN_MENU_KEYBOARD = {
@@ -42,7 +43,7 @@ def send_message_with_menu(chat_id, text, keyboard=None):
 
 def answer_callback_query(callback_query_id, text=""):
     url = f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery"
-    payload = {"callback_query_id": callback_query_id, "text": text, "show_alert": False}
+    payload = {"callback_query_id": callback_query_id, "text": text, "show_alert": True}
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
@@ -50,8 +51,8 @@ def answer_callback_query(callback_query_id, text=""):
 
 def listen_telegram_updates():
     try:
-        requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook", timeout=5)
-        print("Webhook successfully cleared/reset.")
+        requests.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
+        print("Webhook successfully cleared.")
     except Exception as e:
         print("Could not clear webhook:", e)
 
@@ -67,46 +68,46 @@ def listen_telegram_updates():
                 for result in data.get("result", []):
                     offset = result["update_id"] + 1
                     
+                    # Traitement prioritaire des boutons cliqués (callback_query)
                     if "callback_query" in result:
-                        callback_query = result["callback_query"]
-                        callback_query_id = callback_query["id"]
-                        chat_id = callback_query["message"]["chat"]["id"]
-                        data_action = callback_query.get("data", "")
+                        cq = result["callback_query"]
+                        cq_id = cq["id"]
+                        chat_id = cq["message"]["chat"]["id"]
+                        data_action = cq.get("data", "")
                         
-                        if data_action.startswith("reset_"):
-                            if chat_id == ADMIN_ID:
+                        if chat_id == ADMIN_ID:
+                            if data_action.startswith("reset_"):
                                 target_id = int(data_action.split("_")[1])
                                 udata = get_user_data(target_id)
                                 udata["used"] = 0
                                 udata["limit"] = 50
                                 udata["last_signal_time"] = None
-                                answer_callback_query(callback_query_id, "Client recharge avec 50 tours !")
+                                
+                                answer_callback_query(cq_id, "Succes : Client recharge avec 50 tours !")
                                 
                                 requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
                                     "chat_id": ADMIN_ID,
-                                    "text": f"✅ L'utilisateur `{target_id}` a recu son pack de 50 tours.",
+                                    "text": f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours avec succès.",
                                     "parse_mode": "Markdown"
                                 })
                                 send_message_with_menu(
                                     target_id, 
                                     "🎉 *ACTIVATION VALIDEE & COMPTE RECHARGE !*\n\nL'administrateur a valide votre ID 1win. Vous avez recu un pack de *50 signaux* ! Vous pouvez jouer 🚀"
                                 )
-                            else:
-                                answer_callback_query(callback_query_id, "Action reservee a l'admin !")
-                            continue
-                            
-                        elif data_action.startswith("reject_"):
-                            if chat_id == ADMIN_ID:
+                                continue
+                                
+                            elif data_action.startswith("reject_"):
                                 target_id = int(data_action.split("_")[1])
-                                answer_callback_query(callback_query_id, "Rejete.")
+                                answer_callback_query(cq_id, "Demande rejetee.")
                                 requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
                                     "chat_id": ADMIN_ID,
-                                    "text": f"❌ Demande de l'utilisateur `{target_id}` rejetée.",
+                                    "text": f"❌ Demande de l'utilisateur `{target_id}` rejetee.",
                                     "parse_mode": "Markdown"
                                 })
                                 send_message_with_menu(target_id, "❌ *Verification echouee*\n\nL'ID ou le depot n'a pas pu etre valide avec le code promo *RUBB225*. Veuillez reessayer.")
-                            else:
-                                answer_callback_query(callback_query_id, "Action reservee a l'admin !")
+                                continue
+                        else:
+                            answer_callback_query(cq_id, "Action reservee a l'administrateur.")
                             continue
                     
                     if "message" in result:
@@ -124,9 +125,9 @@ def listen_telegram_updates():
                                 })
                                 
                                 admin_alert = (
-                                    f"📥 *PREUVE DE DEPOT / ID REÇUE*\n\n"
+                                    f"📥 *PREUVE DE DEPOT / ID RECUE*\n\n"
                                     f"De l'utilisateur ID : `{chat_id}`\n"
-                                    "Verifiez l'ID ci-dessus sur votre tableau de bord partenaire, puis validez :"
+                                    "Vérifiez l'ID ci-dessus sur votre tableau de bord, puis validez :"
                                 )
                                 admin_kb = {
                                     "inline_keyboard": [
@@ -141,7 +142,7 @@ def listen_telegram_updates():
                                     "reply_markup": admin_kb
                                 })
                                 
-                                send_message_with_menu(chat_id, "⏳ *ID / Preuve bien recu !*\n\nL'administrateur va verifier votre inscription avec le code promo **RUBB225** et recharchera votre compte avec 50 signaux sous peu.")
+                                send_message_with_menu(chat_id, "⏳ *ID / Preuve bien recu !*\n\nL'administrateur va verifier votre inscription avec le code promo **RUBB225** et rechargera votre compte sous peu.")
                                 udata["waiting_deposit"] = False
                                 continue
 
@@ -150,11 +151,7 @@ def listen_telegram_updates():
                             udata = get_user_data(chat_id)
                             
                             if text.startswith("/start"):
-                                welcome_msg = (
-                                    "🚀 *RUBBEN226 ASSURANCE* 🚀\n\n"
-                                    "Bienvenue ! Utilisez les boutons du menu en bas pour naviguer, obtenir vos signaux ou valider votre acces :"
-                                )
-                                send_message_with_menu(chat_id, welcome_msg)
+                                send_message_with_menu(chat_id, "🚀 *RUBBEN226 ASSURANCE* 🚀\n\nBienvenue ! Utilisez les boutons en bas pour naviguer :")
                                 continue
                                 
                             elif text == "⚡ Obtenir un Signal ⚡":
@@ -190,7 +187,6 @@ def listen_telegram_updates():
                                 if current_used >= current_limit:
                                     blocked_msg = (
                                         "⚠️ *VOS SIGNAUX SONT TERMINES*\n\n"
-                                        "_Vous avez epuise vos signaux disponibles._\n\n"
                                         "🔥 *Pour activer votre robot 100% LuckyJet et obtenir 50 nouveaux signaux :*\n"
                                         "1. Inscrivez-vous avec le code promo *RUBB225*\n"
                                         "2. Faites votre depot\n"
@@ -211,27 +207,18 @@ def listen_telegram_updates():
                                         f"🛡️ *ASSURANCE* – {assurance}X\n"
                                         f"📊 *TAUX DE REUSSITE* – {success_rate}%\n"
                                         f"⏱️ *HEURE DE JEU* – {future_time}±\n\n"
-                                        f"📊 *Signaux restants* : {remaining}\n\n"
-                                        "Inscrivez-vous avec le code promo *RUBB225* :\n"
-                                        "👉 [Lien d'inscription](https://1win.ci/casino?p=4kpi)"
+                                        f"📊 *Signaux restants* : {remaining}"
                                     )
                                     send_message_with_menu(chat_id, signal_msg)
                                 continue
                                 
                             elif text == "📸 Envoyer mon ID 1Win":
                                 udata["waiting_deposit"] = True
-                                send_message_with_menu(chat_id, "📸 *ENVOYEZ VOTRE ID 1WIN*\n\nVeuillez envoyer maintenant une **capture d'ecran de votre ID 1win** dans cette conversation.")
+                                send_message_with_menu(chat_id, "📸 *ENVOYEZ VOTRE ID 1WIN*\n\nVeuillez envoyer une capture d'écran ou votre ID 1win dans cette conversation.")
                                 continue
                                 
                             elif text == "📖 Guide Inscription (RUBB225)":
-                                guide_msg = (
-                                    "📖 *GUIDE D'INSCRIPTION & ACTIVATION* 📖\n\n"
-                                    "1️⃣ Creez un compte sur 1Win en utilisant le code promo : `RUBB225`\n"
-                                    "2️⃣ Effectuez votre premier depot.\n"
-                                    "3️⃣ Cliquez sur **Envoyer mon ID 1Win** pour nous transmettre votre capture d'ecran.\n"
-                                    "4️⃣ Recevez vos **50 signaux** apres validation par l'administrateur !"
-                                )
-                                send_message_with_menu(chat_id, guide_msg)
+                                send_message_with_menu(chat_id, "📖 *GUIDE D'INSCRIPTION*\n\n1. Créez un compte 1Win avec le code promo `RUBB225`\n2. Faites un dépôt\n3. Envoyez votre ID.")
                                 continue
                                 
                             elif text == "🆔 Mon ID Telegram":
@@ -239,23 +226,21 @@ def listen_telegram_updates():
                                 continue
                                 
                             elif text == "🎁 Code Promo : RUBB225":
-                                send_message_with_menu(chat_id, "🎁 *CODE PROMO OFFICIEL* :\n\nUtilisez le code `RUBB225` lors de votre inscription sur 1Win pour debloquer votre acces au robot.")
+                                send_message_with_menu(chat_id, "🎁 Code promo officiel : `RUBB225`")
                                 continue
                                 
                             elif text == "💬 Contacter l'Admin":
-                                send_message_with_menu(chat_id, "💬 Pour contacter directement l'administrateur, ecrivez ici : https://t.me/+tzWgZ8RnLog0NTc0")
+                                send_message_with_menu(chat_id, "💬 Contact admin : https://t.me/+tzWgZ8RnLog0NTc0")
                                 continue
                                 
                             elif text == "🔄 Vérifier mon Accès":
-                                used = udata["used"]
-                                limit = udata["limit"]
-                                remaining = max(0, limit - used)
-                                status_msg = (
-                                    "📊 *STATUT DE VOTRE COMPTE*\n\n"
-                                    f"• Signaux utilisés : {used}/{limit}\n"
-                                    f"• Signaux restants : {remaining}\n"
-                                    f"• Mode : {'Administrateur 👑' if chat_id == ADMIN_ID else 'Membre Standard'}"
-                                )
+                                if chat_id == ADMIN_ID:
+                                    status_msg = "📊 *STATUT DE VOTRE COMPTE*\n\n• Signaux : Illimités 👑\n• Mode : Administrateur 👑"
+                                else:
+                                    used = udata["used"]
+                                    limit = udata["limit"]
+                                    remaining = max(0, limit - used)
+                                    status_msg = f"📊 *STATUT DE VOTRE COMPTE*\n\n• Signaux utilisés : {used}/{limit}\n• Signaux restants : {remaining}"
                                 send_message_with_menu(chat_id, status_msg)
                                 continue
                             
@@ -274,7 +259,6 @@ class SimpleHandler(BaseHTTPRequestHandler):
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
-    print(f"Web server running on port {port}")
     server.serve_forever()
 
 if __name__ == "__main__":
