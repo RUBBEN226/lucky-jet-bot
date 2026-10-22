@@ -1,3 +1,4 @@
+
 import time
 import threading
 import requests
@@ -87,12 +88,12 @@ def listen_telegram_updates():
                                 
                                 requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
                                     "chat_id": ADMIN_ID,
-                                    "text": f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours avec succès.",
+                                    "text": f"✅ L'utilisateur `{target_id}` a reçu son pack de 50 tours.",
                                     "parse_mode": "Markdown"
                                 })
                                 send_message_with_menu(
                                     target_id, 
-                                    "🎉 *ACTIVATION VALIDEE & COMPTE RECHARGE !*\n\nL'administrateur a valide votre ID 1win. Vous avez recu un pack de *50 signaux* ! Vous pouvez jouer 🚀"
+                                    "🎉 *COMPTE RECHARGE !*\n\nL'administrateur vient de vous offrir un pack de *50 signaux* ! Vous pouvez à nouveau jouer 🚀"
                                 )
                                 continue
                                 
