@@ -1,4 +1,3 @@
-
 import os
 import random
 import requests
@@ -34,7 +33,8 @@ def send_message_with_menu(chat_id, text, keyboard=None):
         "chat_id": chat_id,
         "text": text,
         "parse_mode": "Markdown",
-        "reply_markup": keyboard if keyboard else MAIN_MENU_KEYBOARD
+        "reply_markup": keyboard if keyboard else MAIN_MENU_KEYBOARD,
+        "disable_web_page_preview": True
     }
     try:
         requests.post(url, json=payload, timeout=10)
@@ -197,7 +197,15 @@ def webhook():
                     udata["waiting_deposit"] = True
                     send_message_with_menu(chat_id, "📸 *ENVOYEZ VOTRE ID 1WIN*\n\nVeuillez envoyer une capture d'écran ou votre ID 1win dans cette conversation.")
                 elif text == "📖 Guide Inscription (RUBB225)":
-                    send_message_with_menu(chat_id, "📖 *GUIDE D'INSCRIPTION*\n\n1. Créez un compte 1Win avec le code promo `RUBB225`\n2. Faites un dépôt\n3. Envoyez votre ID.")
+                    guide_msg = (
+                        "📖 *GUIDE D'INSCRIPTION & MOTIVATION* 🚀\n\n"
+                        "1️⃣ Cliquez ici pour créer votre compte : [Lien d'inscription 1Win](https://1win.ci/casino?p=4kpi)\n"
+                        "2️⃣ Utilisez impérativement le code promo : `RUBB225`\n"
+                        "3️⃣ Effectuez votre dépôt pour alimenter votre compte.\n"
+                        "4️⃣ Envoyez votre ID 1Win pour débloquer vos 50 signaux !\n\n"
+                        "💡 *Mot de la fin :* Ne laissez pas passer votre chance de faire fructifier votre capital. Chaque dépôt est un pas de plus vers la liberté financière. Rechargez votre compte dès maintenant, appliquez nos signaux avec rigueur, et transformez vos mises en gros gains ! La victoire appartient aux audacieux 💰🔥"
+                    )
+                    send_message_with_menu(chat_id, guide_msg)
                 elif text == "🆔 Mon ID Telegram":
                     send_message_with_menu(chat_id, f"🆔 Votre identifiant Telegram est : `{chat_id}`")
                 elif text == "🎁 Code Promo : RUBB225":
@@ -224,7 +232,6 @@ def index():
     return "Bot is running with Webhook!"
 
 if __name__ == "__main__":
-    # Configuration automatique du Webhook sur l'URL Render
     render_url = os.environ.get("RENDER_EXTERNAL_URL")
     if render_url:
         webhook_url = f"{render_url}/{TOKEN}"
@@ -233,6 +240,3 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-
-```
-*Note importante : N'oubliez pas d'ajouter Flask dans votre fichier requirements.txt sur GitHub si ce n'est pas déjà fait.* Dès que le déploiement sera terminé, le système de webhook s'enregistrera tout seul et les clics sur vos boutons fonctionneront instantanément sans aucun blocage !
