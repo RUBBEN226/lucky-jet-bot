@@ -1,8 +1,4 @@
 
-Si le bouton ne réagit toujours pas, c'est que le code actuel sur Render utilise la méthode getUpdates qui peut parfois rater les clics sur les boutons en arrière-plan selon la façon dont les requêtes se bloquent.
-Pour éliminer définitivement ce problème et faire en sorte que le bouton réagisse au quart de tour, la solution la plus stable est d'utiliser un **Webhook Telegram** direct (au lieu de getUpdates).
-Voici le script complet configuré avec un Webhook natif et un serveur HTTP intégré. Remplacez tout votre code par celui-ci, mettez-le sur GitHub et laissez Render se déployer :
-```python
 import os
 import random
 import requests
